@@ -1,0 +1,5 @@
+{"order_id":"e8abd5557118f3f5","item":"laptop","quantity":2,"unit_price":22.1,"total":44.2,"a_internal_ms":18.06}  [HTTP 200 en 0.028971s]
+{"order_id":"e8abd5557118f3f5","item":"laptop","quantity":2,"unit_price":22.1,"total":44.2,"a_internal_ms":19.38}  [HTTP 200 en 0.021728s]
+{"order_id":"e8abd5557118f3f5","item":"laptop","quantity":2,"unit_price":22.1,"total":44.2,"a_internal_ms":20.54}  [HTTP 200 en 0.022798s]
+{"order_id":"e8abd5557118f3f5","item":"laptop","quantity":2,"unit_price":22.1,"total":44.2,"a_internal_ms":19.2}  [HTTP 200 en 0.021598s]
+{"order_id":"e8abd5557118f3f5","item":"laptop","quantity":2,"unit_price":22.1,"total":44.2,"a_internal_ms":20.21}  [HTTP 200 en 0.022412s]

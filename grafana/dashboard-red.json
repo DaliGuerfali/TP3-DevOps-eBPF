@@ -1,0 +1,423 @@
+{
+  "uid": "perf-lab-red",
+  "title": "TP eBPF - RED order-api -> pricing-engine",
+  "tags": [
+    "ebpf",
+    "beyla",
+    "red"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "RATE - debit par service (req/s)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(http_server_request_duration_seconds_count{namespace=\"perf-lab\",http_route=~\"/order|/price\"}[1m])) by (service_name)",
+          "legendFormat": "serveur {{service_name}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(http_client_request_duration_seconds_count{namespace=\"perf-lab\",service_name=\"order-api\"}[1m]))",
+          "legendFormat": "client order-api -> pricing-engine",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "ERRORS - % reponses 5xx (vue serveur et vue client)",
+      "description": "Si le % client A->B egale le % serveur de B, la faute vient de B et A ne fait que la propager.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "100 * (1 - sum(rate(http_server_request_duration_seconds_count{namespace=\"perf-lab\",http_route=~\"/order|/price\",http_response_status_code!~\"5..\"}[1m])) by (service_name) / sum(rate(http_server_request_duration_seconds_count{namespace=\"perf-lab\",http_route=~\"/order|/price\"}[1m])) by (service_name))",
+          "legendFormat": "serveur {{service_name}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "100 * (1 - sum(rate(http_client_request_duration_seconds_count{namespace=\"perf-lab\",service_name=\"order-api\",http_response_status_code!~\"5..\"}[1m])) / sum(rate(http_client_request_duration_seconds_count{namespace=\"perf-lab\",service_name=\"order-api\"}[1m])))",
+          "legendFormat": "client order-api -> pricing-engine",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "DURATION - order-api (POST /order)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum(rate(http_server_request_duration_seconds_bucket{namespace=\"perf-lab\",service_name=\"order-api\",http_route=\"/order\"}[1m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{namespace=\"perf-lab\",service_name=\"order-api\",http_route=\"/order\"}[1m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{namespace=\"perf-lab\",service_name=\"order-api\",http_route=\"/order\"}[1m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(http_server_request_duration_seconds_sum{namespace=\"perf-lab\",service_name=\"order-api\",http_route=\"/order\"}[1m])) / sum(rate(http_server_request_duration_seconds_count{namespace=\"perf-lab\",service_name=\"order-api\",http_route=\"/order\"}[1m]))",
+          "legendFormat": "moyenne",
+          "refId": "D"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "DURATION - pricing-engine (GET /price)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum(rate(http_server_request_duration_seconds_bucket{namespace=\"perf-lab\",service_name=\"pricing-engine\",http_route=\"/price\"}[1m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_seconds_bucket{namespace=\"perf-lab\",service_name=\"pricing-engine\",http_route=\"/price\"}[1m])) by (le))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket{namespace=\"perf-lab\",service_name=\"pricing-engine\",http_route=\"/price\"}[1m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(http_server_request_duration_seconds_sum{namespace=\"perf-lab\",service_name=\"pricing-engine\",http_route=\"/price\"}[1m])) / sum(rate(http_server_request_duration_seconds_count{namespace=\"perf-lab\",service_name=\"pricing-engine\",http_route=\"/price\"}[1m]))",
+          "legendFormat": "moyenne",
+          "refId": "D"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "DECOMPOSITION - T_interne(A) = T_serveur(A) - T_client(A->B) (moyennes)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(http_server_request_duration_seconds_sum{namespace=\"perf-lab\",service_name=\"order-api\",http_route=\"/order\"}[1m])) / sum(rate(http_server_request_duration_seconds_count{namespace=\"perf-lab\",service_name=\"order-api\",http_route=\"/order\"}[1m]))",
+          "legendFormat": "T_serveur(A)",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(http_client_request_duration_seconds_sum{namespace=\"perf-lab\",service_name=\"order-api\"}[1m])) / sum(rate(http_client_request_duration_seconds_count{namespace=\"perf-lab\",service_name=\"order-api\"}[1m]))",
+          "legendFormat": "T_client(A->B)",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(rate(http_server_request_duration_seconds_sum{namespace=\"perf-lab\",service_name=\"order-api\",http_route=\"/order\"}[1m])) / sum(rate(http_server_request_duration_seconds_count{namespace=\"perf-lab\",service_name=\"order-api\",http_route=\"/order\"}[1m]))) - (sum(rate(http_client_request_duration_seconds_sum{namespace=\"perf-lab\",service_name=\"order-api\"}[1m])) / sum(rate(http_client_request_duration_seconds_count{namespace=\"perf-lab\",service_name=\"order-api\"}[1m])))",
+          "legendFormat": "T_interne(A)",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "SATURATION - CPU pricing-engine (coeurs) et % periodes throttlees",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"perf-lab\",container=\"pricing-engine\"}[1m]))",
+          "legendFormat": "CPU utilise (coeurs)",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(container_cpu_cfs_throttled_periods_total{namespace=\"perf-lab\",container=\"pricing-engine\"}[1m])) / sum(rate(container_cpu_cfs_periods_total{namespace=\"perf-lab\",container=\"pricing-engine\"}[1m]))",
+          "legendFormat": "ratio periodes throttlees",
+          "refId": "B"
+        }
+      ]
+    }
+  ]
+}

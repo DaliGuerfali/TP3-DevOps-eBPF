@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Compte rendu TP eBPF - RED microservices</title>
+<style>
+  @page { size: A4; margin: 12mm 13mm 12mm 13mm; }
+  :root { --ink:#1d2430; --muted:#5a6475; --accent:#0f7a6c; --line:#d5dbe3; --soft:#f3f6f9; --a:#2a6fdb; --b:#c26a10; --red:#c53030; }
+  * { box-sizing: border-box; }
+  html, body { background:#fff; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: var(--ink); font-size: 9.1pt; line-height: 1.38; margin: 0; }
+  h1 { font-size: 15.5pt; margin: 0 0 2px; line-height: 1.2; }
+  h2 { font-size: 11pt; color: var(--accent); margin: 9px 0 4px; padding-bottom: 2px; border-bottom: 1.5px solid var(--line); }
+  h3 { font-size: 9.6pt; margin: 6px 0 2px; }
+  p { margin: 3px 0 4px; text-align: justify; }
+  ul { margin: 2px 0 4px; padding-left: 15px; }
+  li { margin: 1px 0; }
+  code { font-family: Consolas, monospace; font-size: 8.3pt; background: var(--soft); padding: 0 3px; border-radius: 2px; }
+  .kicker { font-size: 7.8pt; letter-spacing: .08em; color: var(--accent); font-weight: 700; text-transform: uppercase; }
+  .meta { display: flex; justify-content: space-between; border-top: 2px solid var(--ink); border-bottom: 1px solid var(--line); padding: 4px 0; margin: 5px 0 6px; font-size: 8.6pt; }
+  .meta b { color: var(--ink); }
+  .muted { color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; font-size: 8.3pt; margin: 3px 0 5px; }
+  th, td { border: 1px solid var(--line); padding: 2.5px 5px; text-align: right; }
+  th { background: #1d2430; color: #fff; font-weight: 600; }
+  td:first-child, th:first-child { text-align: left; }
+  tr.sub td { background: var(--soft); color: var(--muted); font-size: 7.9pt; }
+  td.hot { color: var(--red); font-weight: 700; }
+  td.ok { color: var(--accent); font-weight: 600; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+  figure { margin: 3px 0 5px; }
+  figure img, figure object { width: 100%; display: block; }
+  figcaption { font-size: 7.6pt; color: var(--muted); margin-top: 1px; text-align: center; }
+  .box { background: var(--soft); border-left: 3px solid var(--accent); padding: 4px 8px; margin: 5px 0; }
+  .formula { text-align: center; font-family: Consolas, monospace; font-size: 9pt; margin: 3px 0; }
+  .page { page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+  .foot { font-size: 7.4pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ============================ PAGE 1 ============================ -->
+<section class="page">
+  <div class="kicker">TP Ingénierie DevOps &amp; observabilité cloud-native · Compte rendu</div>
+  <h1>Analyse des indicateurs RED d'une chaîne de microservices avec eBPF</h1>
+  <div class="meta">
+    <span><b>Équipe :</b> Mohamed Ali Guerfali · Alaeddine Zaouali · Rami Gharbi · Adem Saidi</span>
+    <span class="muted">5<sup>e</sup> année GL – DevOps · 26/11/2026</span>
+  </div>
+
+  <h2>1. Objectif et architecture</h2>
+  <p>Nous avons mesuré les indicateurs <b>RED</b> (<i>Rate, Errors, Duration</i>) d'une chaîne synchrone
+  <code>k6 → order-api (A) → pricing-engine (B)</code> déployée sur Kubernetes, <b>sans aucun SDK de télémétrie</b> dans le code :
+  toutes les métriques sont produites par <b>Grafana Beyla 3.43</b> (OpenTelemetry eBPF Instrumentation) à partir du noyau Linux.</p>
+
+  <figure>
+    <img src="architecture.svg" alt="Architecture et interception eBPF">
+    <figcaption>Figure 1 – Interception des requêtes HTTP au niveau noyau par Beyla, puis chaîne Prometheus → Grafana.</figcaption>
+  </figure>
+
+  <p><b>Comment eBPF intercepte les requêtes.</b> Beyla tourne en DaemonSet avec <code>hostPID</code> et les capacités
+  <code>BPF</code>, <code>SYS_PTRACE</code>, <code>NET_ADMIN</code>, <code>PERFMON</code>. Il repère les processus des Deployments
+  ciblés puis charge de petits programmes vérifiés par le noyau :</p>
+  <ul>
+    <li><b>Service B (Go)</b> : des <b>uprobes</b> s'attachent aux fonctions de <code>net/http</code> du binaire (début et fin de traitement d'une requête).</li>
+    <li><b>Service A (Python)</b> : pas de symboles exploitables, donc des <b>kprobes</b> sur les appels système des sockets TCP
+      (<code>tcp_sendmsg</code>, <code>tcp_recvmsg</code>…). Beyla lit les premiers octets, reconnaît le protocole HTTP et chronomètre
+      chaque échange. Il distingue ainsi les requêtes <b>reçues</b> par A (vue serveur) et celles qu'A <b>émet</b> vers B (vue client).</li>
+    <li>Les événements remontent par un <i>ring buffer</i> ; Beyla les enrichit avec les métadonnées Kubernetes
+      (<code>service_name</code> = nom du Deployment) et expose les histogrammes OpenTelemetry
+      <code>http_server_request_duration_seconds</code> et <code>http_client_request_duration_seconds</code> sur <code>:9090/metrics</code>.</li>
+  </ul>
+
+  <h2>2. Mise en œuvre</h2>
+  <ul>
+    <li><b>Plateforme</b> : cluster <code>kind</code> mono-nœud sur Docker Desktop (noyau WSL2 6.18, BTF activé, 12 vCPU),
+      namespace <code>perf-lab</code>, <code>kube-prometheus-stack</code> minimal (Alertmanager et node-exporter désactivés, collecte toutes les 5 s).</li>
+    <li><b>Services</b> : A = FastAPI + httpx (validation ≈ 2 000 hachages SHA-256 puis appel <code>GET /price</code>) ;
+      B = Go <code>net/http</code>, 15 ± 2 ms de latence et 0,85 ms de CPU réel par requête. Fautes injectées par variables d'environnement
+      (<code>ERROR_RATE</code>, <code>SLOW_RATIO</code>, <code>SLOW_LATENCY_MS</code>).</li>
+    <li><b>Charge</b> : k6 s'exécute <b>dans le cluster</b> (Job) en mode <i>arrival-rate</i> : 50 RPS pendant 3 min, puis paliers de 60 s
+      de 25 à 150 RPS. Un <code>port-forward</code> aurait ajouté sa propre latence.</li>
+    <li><b>Vérification (partie 2)</b> : après 20 commandes envoyées avec <code>curl</code>, <code>/metrics</code> affichait exactement
+      20 requêtes serveur sur <code>/order</code>, 20 sur <code>/price</code> et 20 requêtes client <code>order-api → pricing-engine:8080</code>.</li>
+    <li><b>Difficulté rencontrée</b> : dans Beyla 3.x, les sélecteurs <code>discovery.instrument</code> sont des <b>motifs glob</b> et non des regex.
+      Notre premier filtre <code>^(order-api|pricing-engine)$</code> n'instrumentait rien. Nous avons aussi exclu les sondes
+      <code>/health</code> via <code>http_route</code> et ajouté des buckets fins (15–30 ms, 600–650 ms) pour des percentiles précis.</li>
+  </ul>
+</section>
+
+<!-- ============================ PAGE 2 ============================ -->
+<section class="page">
+  <h2>3. Tableau comparatif des régimes testés</h2>
+  <p>Valeurs de bout en bout mesurées par <b>k6</b> (côté client) et, en dessous, par <b>Beyla/eBPF</b> sur le serveur
+  <code>order-api</code> (fenêtre du tir, hors 10 premières secondes). Pour la saturation CPU, les chiffres couvrent toute la rampe 25 → 150 RPS.</p>
+  <table>
+    <tr><th>Régime</th><th>RPS</th><th>Moyenne</th><th>p50</th><th>p95</th><th>p99</th><th>% erreurs</th></tr>
+    <tr><td><b>Nominal</b> (50 RPS)</td><td>50,0</td><td>20,2 ms</td><td>20,0 ms</td><td>23,2 ms</td><td>23,9 ms</td><td class="ok">0 %</td></tr>
+    <tr class="sub"><td>&nbsp;&nbsp;Beyla – serveur A</td><td>49,9</td><td>19,8 ms</td><td>19,2 ms</td><td>24,4 ms</td><td>24,9 ms</td><td>0 %</td></tr>
+    <tr><td><b>Injection d'erreurs</b> (B : 10 % HTTP 500)</td><td>50,0</td><td>20,4 ms</td><td>20,0 ms</td><td>23,6 ms</td><td>26,1 ms</td><td class="hot">10,2 %</td></tr>
+    <tr class="sub"><td>&nbsp;&nbsp;Beyla – serveur A</td><td>49,4</td><td>19,9 ms</td><td>19,2 ms</td><td>24,5 ms</td><td>25,0 ms</td><td>10,24 %</td></tr>
+    <tr><td><b>Tail latency</b> (B : 5 % à 600 ms)</td><td>49,9</td><td>48,5 ms</td><td>20,1 ms</td><td>25,8 ms</td><td class="hot">605 ms</td><td class="ok">0 %</td></tr>
+    <tr class="sub"><td>&nbsp;&nbsp;Beyla – serveur A</td><td>50,1</td><td>48,0 ms</td><td>19,5 ms</td><td>26,0 ms</td><td>620 ms</td><td>0 %</td></tr>
+    <tr><td><b>Saturation CPU</b> (B limité à 100m, rampe)</td><td>60,8</td><td class="hot">7,56 s</td><td>561 ms</td><td class="hot">30,0 s</td><td class="hot">30,0 s</td><td class="hot">15,8 %*</td></tr>
+    <tr class="sub"><td>&nbsp;&nbsp;Beyla – serveur A</td><td>62,3</td><td>7,42 s</td><td>547 ms</td><td>≥ 10 s**</td><td>≥ 10 s**</td><td>0 %</td></tr>
+  </table>
+  <p class="foot">* délais d'attente k6 (30 s) : aucune réponse 5xx côté serveur ; 7 497 requêtes n'ont même pas pu être émises (1 500 utilisateurs virtuels occupés).
+  ** valeur bornée par le dernier bucket fini de l'histogramme (10 s) : <code>histogram_quantile</code> ne peut pas aller au-delà.</p>
+  <p><b>Fiabilité de la mesure eBPF.</b> Sur les trois régimes stables, Beyla et k6 concordent à moins de 1 ms près sur la moyenne.
+  L'écart de 0,4 ms correspond au trajet réseau k6 → A. Le p99 « tail » vaut 620 ms côté Beyla contre 605 ms côté k6 :
+  c'est l'erreur d'interpolation linéaire de <code>histogram_quantile</code> à l'intérieur du bucket [600 ; 625 ms].</p>
+
+  <h2>4. Décomposition de la latence entre order-api et pricing-engine</h2>
+  <div class="formula">T<sub>interne</sub>(A) = T<sub>serveur</sub>(A) − T<sub>client</sub>(A → B)</div>
+  <p>Nous utilisons les <b>moyennes</b> (<code>_sum / _count</code>) car elles sont additives. Les percentiles ne se soustraient pas :
+  le p99 de A et le p99 de son appel à B ne concernent pas forcément les mêmes requêtes.</p>
+  <table>
+    <tr><th>Moyennes mesurées par eBPF</th><th>Nominal</th><th>Erreurs 10 %</th><th>Tail latency</th><th>Palier 100 RPS (CPU)</th><th>Palier 150 RPS (CPU)</th></tr>
+    <tr><td>T<sub>serveur</sub>(A) – requête <code>POST /order</code></td><td>19,8 ms</td><td>19,9 ms</td><td>48,0 ms</td><td>790 ms</td><td>21 816 ms</td></tr>
+    <tr><td>T<sub>client</sub>(A → B) – appel vu par A</td><td>17,0 ms</td><td>17,1 ms</td><td>45,1 ms</td><td>784 ms</td><td>419 ms</td></tr>
+    <tr><td><b>T<sub>interne</sub>(A)</b> = différence</td><td class="ok">2,8 ms</td><td class="ok">2,8 ms</td><td class="ok">2,9 ms</td><td class="ok">6 ms</td><td class="hot">21 397 ms</td></tr>
+    <tr class="sub"><td>T<sub>serveur</sub>(B) – <code>GET /price</code></td><td>16,6 ms</td><td>16,7 ms</td><td>44,6 ms</td><td>522 ms</td><td>133 ms</td></tr>
+    <tr class="sub"><td>Réseau + pile HTTP + attente A↔B = T<sub>client</sub>(A→B) − T<sub>serveur</sub>(B)</td><td>0,4 ms</td><td>0,4 ms</td><td>0,5 ms</td><td>262 ms</td><td>286 ms</td></tr>
+  </table>
+  <div class="box">
+  <b>Lecture.</b> En nominal, une commande de 19,8 ms se répartit en <b>16,6 ms dans B</b> (84 %), <b>0,4 ms de réseau</b> (2 %) et
+  <b>2,8 ms de traitement propre à A</b> (14 %). Si l'on veut accélérer le service, c'est B qu'il faut optimiser. En <i>tail latency</i>,
+  T<sub>interne</sub>(A) ne bouge pas (2,9 ms) : la dégradation vient entièrement de B. Au palier 100 RPS, l'attente se situe encore
+  dans B et devant B (262 ms de file avant que B ne lise la requête, processus bridé par le <i>throttling</i>). À 150 RPS, en revanche,
+  <b>T<sub>interne</sub>(A) explose à 21,4 s</b> : le goulot d'étranglement s'est déplacé vers A (voir § 7). Sans la vue client
+  fournie par eBPF, ce déplacement serait invisible.
+  </div>
+</section>
+
+<!-- ============================ PAGE 3 ============================ -->
+<section class="page">
+  <h2>5. Errors – propagation et isolation du service fautif</h2>
+  <div class="grid2">
+    <figure>
+      <img src="figures/errors.png" alt="Propagation des erreurs">
+      <figcaption>Figure 2 – % de réponses 5xx (fenêtre glissante de 30 s) avec <code>ERROR_RATE=0.10</code> sur B.</figcaption>
+    </figure>
+    <div>
+      <p>Avec 10 % d'erreurs injectées dans B, les trois courbes se superposent :</p>
+      <table>
+        <tr><th>Vue eBPF</th><th>% 5xx</th></tr>
+        <tr><td>Serveur pricing-engine (B)</td><td>10,25 %</td></tr>
+        <tr><td>Client order-api → pricing-engine</td><td>10,25 %</td></tr>
+        <tr><td>Serveur order-api (A)</td><td>10,24 %</td></tr>
+        <tr><td>Vu par l'utilisateur (k6)</td><td>10,21 %</td></tr>
+      </table>
+      <p>A n'ajoute <b>aucune</b> erreur : elle transforme chaque 500 reçu en 502 renvoyé.</p>
+    </div>
+  </div>
+  <p><b>Comment isoler le fautif.</b> Pour chaque service, on compare ses erreurs <b>serveur</b> (ce qu'il renvoie) à ses erreurs
+  <b>client</b> (ce qu'il reçoit de ses dépendances). Pour A, les deux taux sont égaux : A ne fait que <b>propager</b>.
+  Pour B, les erreurs serveur ne sont expliquées par aucun appel sortant : <b>B est la source</b>. Comme Beyla mesure les deux côtés
+  de chaque connexion sans instrumentation manuelle, ce raisonnement se lit directement dans Grafana, sans fouiller les journaux ni
+  modifier le code. On peut aussi suivre la chaîne de proche en proche sur un graphe plus long.</p>
+
+  <h2>6. Question 1 – Latence de traîne (95 % à 15 ms, 5 % à 600 ms)</h2>
+  <div class="grid2">
+    <figure>
+      <img src="figures/tail.png" alt="Percentiles en tail latency">
+      <figcaption>Figure 3 – order-api : p50, p95, p99 et moyenne (échelle log, fenêtre 30 s).</figcaption>
+    </figure>
+    <div>
+      <table>
+        <tr><th>order-api (k6)</th><th>Nominal</th><th>Tail</th></tr>
+        <tr><td>p50</td><td>20,0 ms</td><td>20,1 ms</td></tr>
+        <tr><td>p95</td><td>23,2 ms</td><td>25,8 ms</td></tr>
+        <tr><td>p99</td><td>23,9 ms</td><td class="hot">605 ms</td></tr>
+        <tr><td>Moyenne</td><td>20,2 ms</td><td>48,5 ms</td></tr>
+        <tr><td>Maximum</td><td>37,8 ms</td><td>608 ms</td></tr>
+      </table>
+      <p>Le p50 n'a pas bougé (+0,1 ms) alors que le p99 a été multiplié par <b>25</b>.</p>
+    </div>
+  </div>
+  <p><b>Pourquoi le p50 reste vers 20 ms.</b> Un percentile est un <b>rang</b>, pas une moyenne. Trions les 9 000 requêtes par durée :
+  les 95 % premières (≈ 8 550) sont rapides, à 17,5 ms dans B + 2,9 ms dans A ≈ 20 ms. Le p50 (rang 4 500) et même le p90 tombent
+  dans ce groupe : les 5 % de requêtes lentes ne les influencent pas. Le p99 (rang 8 910) tombe au contraire dans le groupe lent
+  et vaut donc ≈ 600 ms + 20 ms. Le p95 est pile à la frontière (rang 8 550) : il oscille entre 26 ms et 600 ms selon la fenêtre
+  (Figure 3). C'est un signal classique d'une population <b>bimodale</b>.</p>
+  <p><b>Pourquoi la moyenne trompe.</b> Moyenne théorique ≈ 0,95 × 20 + 0,05 × 620 = 19 + 31 = <b>50 ms</b> (mesuré : 48,5 ms).
+  Elle décrit un utilisateur à 48 ms qui n'existe pas : <b>19 utilisateurs sur 20</b> attendent 20 ms, et <b>1 sur 20</b> attend
+  ≈ 605 ms, soit <b>30 fois plus</b>. Un tableau de bord fondé sur la moyenne afficherait une hausse modérée (×2,4) et masquerait
+  une expérience 30 fois pire pour 5 % des clients. L'effet s'amplifie en microservices : une page qui déclenche 10 appels de ce type
+  a 1 − 0,95<sup>10</sup> ≈ <b>40 %</b> de chances de subir au moins une requête lente. Les SLO doivent donc porter sur p95/p99.</p>
+</section>
+
+<!-- ============================ PAGE 4 ============================ -->
+<section class="page">
+  <h2>7. Question 2 – Saturation CPU et point d'inflexion (B limité à 100m)</h2>
+  <figure>
+    <img src="figures/cpu.png" alt="Débit et latence pendant la rampe" style="width:92%;margin:auto">
+    <figcaption>Figure 4 – Débit demandé (k6) vs débit traité (Rate), et latence p50/p99 de order-api (échelle log ; plafond à 10 s = dernier bucket).</figcaption>
+  </figure>
+  <figure>
+    <img src="figures/cpu-throttle.png" alt="CPU et throttling" style="width:92%;margin:auto">
+    <figcaption>Figure 5 – CPU consommé par A et B (millicœurs, log) et % de périodes CFS où B a été bridé.</figcaption>
+  </figure>
+  <table>
+    <tr><th>Palier k6</th><th>Débit traité</th><th>Moy. A</th><th>p99 A</th><th>CPU B</th><th>B bridé</th><th>CPU A</th><th>L = λ·W (en vol)</th></tr>
+    <tr><td>25 RPS</td><td>24,6</td><td>20 ms</td><td>25 ms</td><td>37m</td><td>1 %</td><td>86m</td><td>0,5</td></tr>
+    <tr><td>50 RPS</td><td>49,1</td><td>20 ms</td><td>25 ms</td><td>82m</td><td>3 %</td><td>153m</td><td>1,0</td></tr>
+    <tr><td>75 RPS</td><td>76,0</td><td>93 ms</td><td>417 ms</td><td class="hot">97m</td><td class="hot">99 %</td><td>239m</td><td>7</td></tr>
+    <tr><td><b>100 RPS</b></td><td class="ok"><b>95,6</b> (max 104)</td><td>790 ms</td><td class="hot">4,7 s</td><td>86m</td><td class="hot">100 %</td><td>377m</td><td>76</td></tr>
+    <tr><td>125 RPS</td><td class="hot">61,9</td><td class="hot">13,3 s</td><td>≥ 10 s</td><td>64m</td><td>45 %</td><td class="hot">1 003m</td><td>821</td></tr>
+    <tr><td>150 RPS</td><td class="hot">68,1</td><td class="hot">21,8 s</td><td>≥ 10 s</td><td>63m</td><td>50 %</td><td class="hot">1 002m</td><td>1 485</td></tr>
+  </table>
+  <p><b>Point d'inflexion.</b> Jusqu'à 50 RPS, le débit suit la demande et la latence reste plate (20 ms). À <b>75 RPS</b>, B atteint
+  sa limite (97m consommés, 99 % des périodes CFS bridées) : le débit suit encore, mais le p99 passe de 25 à 417 ms. Le <b>coude</b>
+  se situe entre <b>75 et 100 RPS</b> : le débit plafonne à <b>≈ 100 RPS</b> (95,6 en moyenne, 104 au pic), soit la capacité
+  théorique de 100 ms CPU/s ÷ ≈ 1 ms CPU par requête, tandis que la latence moyenne est multipliée par 40 (20 → 790 ms). Au-delà,
+  le système <b>s'effondre</b> : le débit <b>redescend</b> à 62–68 RPS, la latence atteint 22 s et k6 abandonne 15,8 % des requêtes à 30 s.</p>
+  <p><b>File d'attente et loi de Little</b> (<code>L = λ · W</code> : requêtes en cours = débit × temps de séjour). Tant que λ reste
+  sous la capacité μ, la file est vide et W ≈ temps de service. Quand ρ = λ/μ tend vers 1, l'attente croît en 1/(1 − ρ) (M/M/1) :
+  c'est la « crosse de hockey ». Si λ &gt; μ, la file grossit <b>sans limite</b> d'environ (λ − μ) requêtes par seconde. Mesuré :
+  L = 1 → 7 → 76 → 821 → <b>1 485 requêtes en vol</b>, bloqué par le plafond de <b>1 500 utilisateurs virtuels</b> de k6.
+  Vérification indépendante : avec L = 1 500 et λ = 68 req/s, Little <b>prédit</b> W = 1 500 / 68 ≈ <b>22 s</b> ; nous mesurons 21,8 s.
+  La latence n'est plus fixée par le service mais par la longueur de la file.</p>
+  <div class="box"><b>Deuxième goulot révélé par eBPF.</b> Au-delà de 100 RPS, T<sub>client</sub>(A→B) retombe à 0,4–0,6 s alors que
+  T<sub>interne</sub>(A) dépasse 12 s et que le CPU de B redescend à 63m : c'est désormais <b>A</b> (un seul processus Python) qui
+  sature un cœur (1 003m) en gérant plus de 800 connexions. Sans <i>backpressure</i>, la file migre en amont : c'est l'effondrement
+  par congestion. Remèdes : timeouts courts et <i>load shedding</i> (503 rapides), limitation de débit, plusieurs workers pour A,
+  HPA sur B. Ces échecs sont des <b>délais dépassés</b>, pas des 5xx : le pilier <i>Errors</i> doit inclure les timeouts côté client.</div>
+
+  <h2>8. Conclusion</h2>
+  <p>Sans une ligne de code d'instrumentation, Beyla a fourni des métriques RED fiables (écart &lt; 1 ms avec k6), en vue serveur
+  <b>et</b> client, pour un service Python et un service Go. Trois règles en ressortent : piloter par les percentiles (le p99 a révélé
+  ce que la moyenne cachait), lire Rate et Duration ensemble pour trouver le coude de saturation, et rester loin de ρ = 1.</p>
+</section>
+
+<!-- ============================ ANNEXE ============================ -->
+<section class="page">
+  <h2>Annexe – Captures du tableau de bord Grafana (export JSON : <code>grafana/dashboard-red.json</code>)</h2>
+  <figure>
+    <img src="../results/grafana-errors.png" alt="Grafana - injection d'erreurs" style="width:88%;margin:auto">
+    <figcaption>Régime « injection d'erreurs » : les panneaux Rate, Errors (serveur et client), Duration, décomposition et CPU.</figcaption>
+  </figure>
+  <figure>
+    <img src="../results/grafana-cpu.png" alt="Grafana - saturation CPU" style="width:88%;margin:auto">
+    <figcaption>Régime « saturation CPU » : plafonnement puis chute du débit ; T<sub>interne</sub>(A) domine au-delà de 100 RPS ; 100 % de throttling sur B.</figcaption>
+  </figure>
+</section>
+
+</body>
+</html>

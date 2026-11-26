@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 318" font-family="Segoe UI, Arial, sans-serif" font-size="11">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333"/>
+    </marker>
+    <marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7b4fc9"/>
+    </marker>
+  </defs>
+
+  <!-- Espace utilisateur -->
+  <rect x="4" y="4" width="752" height="150" rx="6" fill="#f4f7fb" stroke="#c9d3e0"/>
+  <text x="14" y="20" font-weight="600" fill="#4a5568">ESPACE UTILISATEUR — nœud kind « perf-lab-control-plane » (namespace perf-lab)</text>
+
+  <rect x="16" y="40" width="96" height="52" rx="5" fill="#fff" stroke="#888"/>
+  <text x="64" y="61" text-anchor="middle" font-weight="600">k6 (Job)</text>
+  <text x="64" y="77" text-anchor="middle" fill="#555">50 → 150 RPS</text>
+
+  <rect x="150" y="34" width="150" height="64" rx="5" fill="#fff" stroke="#2a6fdb" stroke-width="1.5"/>
+  <text x="225" y="53" text-anchor="middle" font-weight="600" fill="#2a6fdb">A · order-api</text>
+  <text x="225" y="68" text-anchor="middle" fill="#555">Python FastAPI · POST /order</text>
+  <text x="225" y="83" text-anchor="middle" fill="#555">aucun SDK de télémétrie</text>
+
+  <rect x="350" y="34" width="150" height="64" rx="5" fill="#fff" stroke="#e8821a" stroke-width="1.5"/>
+  <text x="425" y="53" text-anchor="middle" font-weight="600" fill="#c26a10">B · pricing-engine</text>
+  <text x="425" y="68" text-anchor="middle" fill="#555">Go net/http · GET /price</text>
+  <text x="425" y="83" text-anchor="middle" fill="#555">fautes : env vars</text>
+
+  <line x1="112" y1="66" x2="148" y2="66" stroke="#333" stroke-width="1.4" marker-end="url(#a)"/>
+  <line x1="300" y1="66" x2="348" y2="66" stroke="#333" stroke-width="1.4" marker-end="url(#a)"/>
+  <text x="324" y="60" text-anchor="middle" fill="#555" font-size="9.5">HTTP</text>
+
+  <rect x="545" y="30" width="200" height="74" rx="5" fill="#efe9fb" stroke="#7b4fc9" stroke-width="1.5"/>
+  <text x="645" y="48" text-anchor="middle" font-weight="600" fill="#5b34a8">Beyla (DaemonSet, hostPID)</text>
+  <text x="645" y="63" text-anchor="middle" fill="#444">parse HTTP + métadonnées k8s</text>
+  <text x="645" y="77" text-anchor="middle" fill="#444">→ histogrammes OTel</text>
+  <text x="645" y="92" text-anchor="middle" fill="#444" font-family="Consolas, monospace" font-size="10">:9090/metrics</text>
+
+  <rect x="545" y="118" width="94" height="28" rx="5" fill="#fff" stroke="#888"/>
+  <text x="592" y="136" text-anchor="middle">Prometheus (5 s)</text>
+  <rect x="651" y="118" width="94" height="28" rx="5" fill="#fff" stroke="#888"/>
+  <text x="698" y="136" text-anchor="middle">Grafana (RED)</text>
+  <line x1="592" y1="104" x2="592" y2="116" stroke="#333" marker-end="url(#a)"/>
+  <line x1="639" y1="132" x2="649" y2="132" stroke="#333" marker-end="url(#a)"/>
+
+  <!-- Frontiere noyau -->
+  <line x1="4" y1="166" x2="756" y2="166" stroke="#999" stroke-dasharray="6 4"/>
+  <text x="380" y="161" text-anchor="middle" fill="#777" font-size="9.5">appels système (read / write / sendmsg / recvmsg sur les sockets TCP)</text>
+
+  <!-- Noyau -->
+  <rect x="4" y="172" width="752" height="142" rx="6" fill="#fbf6ee" stroke="#e3d3b8"/>
+  <text x="14" y="189" font-weight="600" fill="#7a5a26">NOYAU LINUX 6.18 (WSL2, BTF activé) — programmes eBPF chargés par Beyla</text>
+
+  <rect x="150" y="200" width="150" height="58" rx="5" fill="#fff" stroke="#2a6fdb"/>
+  <text x="225" y="217" text-anchor="middle" font-weight="600">kprobes socket / TCP</text>
+  <text x="225" y="232" text-anchor="middle" fill="#555">tcp_sendmsg, tcp_recvmsg…</text>
+  <text x="225" y="247" text-anchor="middle" fill="#555">(processus Python)</text>
+
+  <rect x="350" y="200" width="150" height="58" rx="5" fill="#fff" stroke="#e8821a"/>
+  <text x="425" y="217" text-anchor="middle" font-weight="600">uprobes Go</text>
+  <text x="425" y="232" text-anchor="middle" fill="#555">net/http serverHandler,</text>
+  <text x="425" y="247" text-anchor="middle" fill="#555">Transport.roundTrip</text>
+
+  <rect x="545" y="200" width="200" height="58" rx="5" fill="#fff" stroke="#7b4fc9"/>
+  <text x="645" y="217" text-anchor="middle" font-weight="600">maps eBPF / ring buffer</text>
+  <text x="645" y="232" text-anchor="middle" fill="#555">début, fin, méthode, route,</text>
+  <text x="645" y="247" text-anchor="middle" fill="#555">statut HTTP, PID, connexion</text>
+
+  <line x1="225" y1="98" x2="225" y2="198" stroke="#2a6fdb" stroke-dasharray="3 3" marker-end="url(#a)"/>
+  <line x1="425" y1="98" x2="425" y2="198" stroke="#e8821a" stroke-dasharray="3 3" marker-end="url(#a)"/>
+  <line x1="300" y1="229" x2="348" y2="229" stroke="#333" opacity="0"/>
+  <path d="M500,229 L543,229" stroke="#333" marker-end="url(#a)"/>
+  <path d="M300,250 C330,285 520,285 560,260" stroke="#333" fill="none" marker-end="url(#a)"/>
+  <path d="M645,198 L645,106" stroke="#7b4fc9" stroke-width="1.6" marker-end="url(#p)"/>
+  <text x="638" y="182" text-anchor="end" fill="#5b34a8" font-size="9.5">événements lus par Beyla</text>
+
+  <text x="16" y="282" fill="#555" font-size="9.5">Pour A, Beyla voit</text>
+  <text x="16" y="295" fill="#555" font-size="9.5">2 flux : serveur (k6→A)</text>
+  <text x="16" y="308" fill="#555" font-size="9.5">et client (A→B).</text>
+  <text x="380" y="303" text-anchor="middle" fill="#555" font-size="9.5">Aucune modification du code ni redémarrage : les sondes s'attachent aux processus déjà lancés.</text>
+</svg>

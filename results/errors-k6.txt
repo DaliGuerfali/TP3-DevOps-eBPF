@@ -1,0 +1,21 @@
+     ✗ status 200
+      ↳  89% — ✓ 8082 / ✗ 919
+
+     checks.........................: 89.79% ✓ 8082      ✗ 919 
+     data_received..................: 2.1 MB 12 kB/s
+     data_sent......................: 1.6 MB 9.1 kB/s
+     http_req_blocked...............: avg=8.53µs  min=3.54µs  med=5.91µs  p(90)=8.67µs   p(95)=10.87µs  p(99)=31.15µs  max=1.6ms   
+     http_req_connecting............: avg=1.13µs  min=0s      med=0s      p(90)=0s       p(95)=0s       p(99)=0s       max=307.42µs
+     http_req_duration..............: avg=20.36ms min=16.54ms med=20.04ms p(90)=23.03ms  p(95)=23.63ms  p(99)=26.08ms  max=42.1ms  
+       { expected_response:true }...: avg=20.37ms min=16.54ms med=20.05ms p(90)=23.04ms  p(95)=23.67ms  p(99)=26.16ms  max=42.1ms  
+     http_req_failed................: 10.20% ✓ 919       ✗ 8082
+     http_req_receiving.............: avg=91.76µs min=35.46µs med=83.13µs p(90)=131.87µs p(95)=152.73µs p(99)=202.89µs max=1.36ms  
+     http_req_sending...............: avg=38.83µs min=12.62µs med=37.29µs p(90)=51.94µs  p(95)=61.56µs  p(99)=90.46µs  max=390.78µs
+     http_req_tls_handshaking.......: avg=0s      min=0s      med=0s      p(90)=0s       p(95)=0s       p(99)=0s       max=0s      
+     http_req_waiting...............: avg=20.23ms min=16.44ms med=19.91ms p(90)=22.89ms  p(95)=23.5ms   p(99)=25.85ms  max=41.92ms 
+     http_reqs......................: 9001   50.001515/s
+     iteration_duration.............: avg=20.6ms  min=16.7ms  med=20.26ms p(90)=23.27ms  p(95)=23.91ms  p(99)=26.54ms  max=42.43ms 
+     iterations.....................: 9001   50.001515/s
+     vus............................: 1      min=1       max=1 
+     vus_max........................: 50     min=50      max=50
+K6_SUMMARY_JSON {"mode":"constant","rps":50.00151519895371,"requests":9001,"error_ratio":0.10209976669258972,"dropped":0,"avg":20.36691391289862,"p50":20.047333,"p90":23.032515,"p95":23.63759,"p99":26.086519,"max":42.105899}

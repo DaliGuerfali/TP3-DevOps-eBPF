@@ -1,0 +1,32 @@
+# Tir de charge k6 execute DANS le cluster (pas de port-forward qui
+# fausserait les latences). Le script vient du ConfigMap k6-script :
+#   kubectl -n perf-lab create configmap k6-script --from-file=k6/order-load.js
+# __NAME__, __MODE__ et __RPS__ sont remplaces par scripts/run-scenario.sh
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6-__NAME__
+  namespace: perf-lab
+  labels: { app: k6 }
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels: { app: k6 }
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: grafana/k6:0.54.0
+          args: ["run", "--quiet", "/scripts/order-load.js"]
+          env:
+            - { name: MODE, value: "__MODE__" }
+            - { name: RPS, value: "__RPS__" }
+            - { name: DURATION, value: "3m" }
+            - { name: TARGET, value: "http://order-api.perf-lab.svc:8000/order" }
+          volumeMounts:
+            - { name: script, mountPath: /scripts }
+      volumes:
+        - name: script
+          configMap: { name: k6-script }

@@ -1,0 +1,20 @@
+
+== cpu  (k6: {'mode': 'ramp', 'rps': 60.75914168823803, 'requests': 23690, 'error_ratio': 0.1581680033769523, 'dropped': 7497, 'avg': 7562.13961036651, 'p50': 561.0349679999999, 'p90': 29998.8222535, 'p95': 29999.70751775, 'p99': 30000.79372656, 'max': 30015.722039})
+  order-api (serveur)                      req=  23673 rps=  62.3 avg= 7418.2 p50=  546.8 p95=10000.0 p99=10000.0 err= 0.00%
+  pricing-engine (serveur)                 req=  22196 rps=  58.4 avg=  227.9 p50=   65.1 p95=  942.2 p99= 2017.6 err= 0.00%
+  order-api -> pricing-engine (client)     req=  22016 rps=  57.9 avg=  441.3 p50=  165.1 p95= 1892.0 p99= 3449.9 err= 0.00%
+
+== errors  (k6: {'mode': 'constant', 'rps': 50.00151519895371, 'requests': 9001, 'error_ratio': 0.10209976669258972, 'dropped': 0, 'avg': 20.36691391289862, 'p50': 20.047333, 'p90': 23.032515, 'p95': 23.63759, 'p99': 26.086519, 'max': 42.105899})
+  order-api (serveur)                      req=   8452 rps=  49.4 avg=   19.9 p50=   19.2 p95=   24.5 p99=   25.0 err=10.24%
+  pricing-engine (serveur)                 req=   8452 rps=  49.4 avg=   16.7 p50=   17.4 p95=   19.7 p99=   20.0 err=10.25%
+  order-api -> pricing-engine (client)     req=   8452 rps=  49.4 avg=   17.1 p50=   17.5 p95=   19.9 p99=   23.1 err=10.25%
+
+== nominal  (k6: {'mode': 'constant', 'rps': 50.00176260463331, 'requests': 9000, 'error_ratio': 0, 'dropped': 0, 'avg': 20.19276317922227, 'p50': 19.990749, 'p90': 22.8126394, 'p95': 23.2151143, 'p99': 23.944763860000002, 'max': 37.757841})
+  order-api (serveur)                      req=   8540 rps=  49.9 avg=   19.8 p50=   19.2 p95=   24.4 p99=   24.9 err= 0.00%
+  pricing-engine (serveur)                 req=   8540 rps=  49.9 avg=   16.6 p50=   17.4 p95=   19.7 p99=   19.9 err= 0.00%
+  order-api -> pricing-engine (client)     req=   8540 rps=  49.9 avg=   17.0 p50=   17.5 p95=   19.9 p99=   23.3 err= 0.00%
+
+== tail  (k6: {'mode': 'constant', 'rps': 49.85050279659135, 'requests': 9001, 'error_ratio': 0, 'dropped': 0, 'avg': 48.45409730463281, 'p50': 20.13402, 'p90': 23.338739, 'p95': 25.789191, 'p99': 605.013223, 'max': 608.080743})
+  order-api (serveur)                      req=   8617 rps=  50.1 avg=   48.0 p50=   19.5 p95=   26.0 p99=  619.8 err= 0.00%
+  pricing-engine (serveur)                 req=   8617 rps=  50.1 avg=   44.6 p50=   17.5 p95=   20.0 p99=  619.8 err= 0.00%
+  order-api -> pricing-engine (client)     req=   8619 rps=  50.1 avg=   45.1 p50=   17.6 p95=   24.7 p99=  619.8 err= 0.00%
